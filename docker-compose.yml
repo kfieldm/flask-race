@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ./services/web
+    command: >
+      gunicorn 
+      --bind 0.0.0.0:5000 project:app
+      --access-logfile -
+    env_file:
+      - ./.env.flask
+      - ./.env.db
+      - ./.env.celery
+    volumes:
+      - ./services/web/migrations:/home/app/web/migrations
+      - ./services/web/project:/home/app/web/project
+    ports:
+      - 80:5000
+    depends_on:
+      - db
+      - redis
+  db:
+    image: postgres:13-alpine
+    env_file:
+      - ./.env.db
+    volumes:
+      - ./services/db/data:/var/lib/postgresql/data/
+  redis:
+    image: redis:6-alpine
+  celery_worker:
+    build:
+      context: ./services/web
+    command: celery -A project.celery worker --loglevel=info
+    env_file:
+      - ./.env.flask
+      - ./.env.db
+      - ./.env.celery
+    volumes:
+      - ./services/web/project:/home/app/web/project
+    depends_on:
+      - db
+      - redis
